@@ -64,9 +64,25 @@ const readAnalyticsFile = (file) => {
             loadEstimatedTime.set(`Estimated time: ${remainingTime+1} second${remainingTime+1 === 1 ? '' : 's'}`);
             decoder.push(data, final);
         };
-        let prevChkEnd = '';
+        let adverstisedServers = [];//servers you are adverstiing the most?
+        const processLine = (line) => {
+            if (!line.includes('video_stream_ended')) return;
+            try {
+                const data = JSON.parse(line.replace(new RegExp('\\"', 'g'), '"'));
+                durationVideoStream += data.duration ? parseInt(data.duration) : 0;
+            } catch {
+                console.log(`[debug] Can not parse line ${line}`);
+            }
+            //if (index === 3) console.log(data);
+            return null;
+        };
+        let previousChunkEnd = '';
         decoder.ondata = (str, final) => {
-            str = prevChkEnd + str;
+            const lines = str.split('\n');
+            if (!lines[0].startsWith('{')) lines[0] = previousChunkEnd + lines[0];
+            if (!lines[lines.length - 1].endsWith('}')) previousChunkEnd = lines.pop();
+            lines.forEach(processLine);
+            str = previousChunkEnd + str;
             for (let event of Object.keys(eventsOccurrences)) {
                 const eventName = snakeCase(event);
                 // eslint-disable-next-line no-constant-condition
@@ -76,7 +92,6 @@ const readAnalyticsFile = (file) => {
                     str = str.slice(ind + eventName.length);
                     eventsOccurrences[event]++;
                 }
-                prevChkEnd = str.slice(-eventName.length);
             }
             if (final) {
                 resolve({
